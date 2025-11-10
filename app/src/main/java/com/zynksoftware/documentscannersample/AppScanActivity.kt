@@ -105,7 +105,9 @@ class AppScanActivity : ScanActivity(), ImageAdapterListener {
 
     private fun getReadStoragePermission(): String {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
+            // NOTE: Remove empty String and uncomment READ_MEDIA_IMAGES here and in AndroidManifest.xml only for testing purposes
+            ""
+//            Manifest.permission.READ_MEDIA_IMAGES
         } else {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 Manifest.permission.ACCESS_MEDIA_LOCATION

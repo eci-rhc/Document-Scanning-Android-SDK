@@ -20,14 +20,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
 package com.zynksoftware.documentscanner.ui.camerascreen
 
 import android.Manifest
-import android.app.Activity
-import android.content.Intent
-import android.os.Build
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
@@ -68,19 +68,13 @@ internal class CameraScreenFragment : BaseFragment(), ScanSurfaceListener {
         }
     }
 
-    private var resultLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == Activity.RESULT_OK) {
-                try {
-                    handleGalleryResult(result.data)
-                } catch (e: FileNotFoundException) {
-                    Log.e(TAG, "FileNotFoundException", e)
-                    onError(
-                        DocumentScannerErrorModel(
-                            DocumentScannerErrorModel.ErrorMessage.TAKE_IMAGE_FROM_GALLERY_ERROR, e
-                        )
-                    )
-                }
+    private val pickPhotoFromGallery: ActivityResultLauncher<PickVisualMediaRequest> =
+        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
+            try {
+                handleGalleryResult(uri)
+            } catch (e: FileNotFoundException) {
+                Log.e(TAG, "FileNotFoundException", e)
+                onError(DocumentScannerErrorModel(DocumentScannerErrorModel.ErrorMessage.TAKE_IMAGE_FROM_GALLERY_ERROR, e))
             }
         }
 
@@ -139,7 +133,7 @@ internal class CameraScreenFragment : BaseFragment(), ScanSurfaceListener {
             switchFlashState()
         }
         binding.galleryButton.setOnClickListener {
-            checkForStoragePermissions()
+            openGallery()
         }
         binding.autoButton.setOnClickListener {
             toggleAutoManualButton()
@@ -169,26 +163,8 @@ internal class CameraScreenFragment : BaseFragment(), ScanSurfaceListener {
             }
     }
 
-    private fun checkForStoragePermissions() {
-        permissionsBuilder(getStoragePermission())
-            .build()
-            .send { result ->
-                if (result.allGranted()) {
-                    selectImageFromGallery()
-                } else if (result.allShouldShowRationale()) {
-                    onError(DocumentScannerErrorModel(DocumentScannerErrorModel.ErrorMessage.STORAGE_PERMISSION_REFUSED_WITHOUT_NEVER_ASK_AGAIN))
-                } else {
-                    onError(DocumentScannerErrorModel(DocumentScannerErrorModel.ErrorMessage.STORAGE_PERMISSION_REFUSED_GO_TO_SETTINGS))
-                }
-            }
-    }
-
-    private fun getStoragePermission(): String {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
+    private fun openGallery() {
+        pickPhotoFromGallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 
     private fun startCamera() {
@@ -219,16 +195,7 @@ internal class CameraScreenFragment : BaseFragment(), ScanSurfaceListener {
         binding.flashButton.hide()
     }
 
-    private fun selectImageFromGallery() {
-        val photoPickerIntent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-        photoPickerIntent.addCategory(Intent.CATEGORY_OPENABLE)
-        photoPickerIntent.type = "image/*"
-        //photoPickerIntent.putExtra(Intent.EXTRA_LOCAL_ONLY, true)
-        resultLauncher.launch(photoPickerIntent)
-    }
-
-    private fun handleGalleryResult(data: Intent?) {
-        val imageUri = data?.data
+    private fun handleGalleryResult(imageUri: Uri?) {
         if (imageUri != null) {
             coroutineScope.launch(Dispatchers.IO) {
                 try {
@@ -287,7 +254,7 @@ internal class CameraScreenFragment : BaseFragment(), ScanSurfaceListener {
     }
 
 
-    private suspend fun isUriValid(uri: android.net.Uri): Boolean = withContext(Dispatchers.IO) {
+    private suspend fun isUriValid(uri: Uri): Boolean = withContext(Dispatchers.IO) {
         return@withContext try {
             requireContext().contentResolver.openInputStream(uri)?.close()
             true

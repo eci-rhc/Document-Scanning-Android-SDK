@@ -69,7 +69,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.eci-rhc"
                 artifactId = "Document-Scanning-Android-SDK"
-                version = "1.3.0"
+                version = "1.3.1"
             }
         }
     }
